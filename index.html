@@ -3,6 +3,365 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VRC Remote Controller</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-primary: #3b82f6;
+            --accent-secondary: #06b6d4;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+        }
+
+        .header {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff05;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #ffffff10;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            padding: 0.3rem 0.8rem;
+            background: var(--card-bg);
+            border-radius: 9999px;
+            border: 1px solid #ffffff10;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--error);
+        }
+
+        .status.connected .status-dot {
+            background-color: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .joystick-zone {
+            width: 40%;
+            height: 60%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #zone_left { order: 1; }
+        #zone_right { order: 2; }
+
+        .center-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .action-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.1s ease;
+        }
+
+        .action-btn:active {
+            background: var(--accent-primary);
+            transform: scale(0.9);
+        }
+
+        .config-overlay {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            border: 1px solid #ffffff10;
+            z-index: 200;
+        }
+
+        input {
+            background: #0f172a;
+            border: 1px solid #ffffff10;
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.4rem;
+            font-size: 0.8rem;
+            width: 150px;
+        }
+
+        .connect-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 0.4rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 600px) {
+            .main-container {
+                flex-direction: column;
+                justify-content: space-around;
+                padding: 1rem 0;
+            }
+            .joystick-zone {
+                width: 100%;
+                height: 35%;
+            }
+            .center-controls {
+                flex-direction: row;
+                gap: 1rem;
+            }
+            .action-btn {
+                width: 70px;
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>VRC REMOTE</h1>
+        <div id="statusIndicator" class="status">
+            <div class="status-dot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </header>
+
+    <div class="config-overlay" id="configOverlay">
+        <input type="text" id="serverUrl" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+        <button class="connect-btn" onclick="toggleConnection()">Connect</button>
+    </div>
+
+    <main class="main-container">
+        <div id="zone_left" class="joystick-zone"></div>
+        
+        <div class="center-controls">
+            <div class="action-btn" onmousedown="sendManualKey('space')" onmouseup="releaseManualKey('space')" ontouchstart="sendManualKey('space')" ontouchend="releaseManualKey('space')">SPACE</div>
+            <div class="action-btn" onmousedown="sendManualKey('c')" onmouseup="releaseManualKey('c')" ontouchstart="sendManualKey('c')" ontouchend="releaseManualKey('c')">CROUCH</div>
+        </div>
+
+        <div id="zone_right" class="joystick-zone"></div>
+    </main>
+
+    <script>
+        let socket = null;
+        let leftJoystick = null;
+        let rightJoystick = null;
+        let activeMoveKeys = new Set();
+        
+        const serverUrlInput = document.getElementById('serverUrl');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        function toggleConnection() {
+            if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+                socket.close();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            const url = serverUrlInput.value.trim();
+            if (!url) return;
+            statusText.innerText = "Connecting...";
+            socket = new WebSocket(url);
+            socket.onopen = () => {
+                statusIndicator.classList.add('connected');
+                statusText.innerText = "Connected";
+                document.getElementById('configOverlay').style.opacity = '0.3';
+            };
+            socket.onclose = () => {
+                statusIndicator.classList.remove('connected');
+                statusText.innerText = "Disconnected";
+                document.getElementById('configOverlay').style.opacity = '1';
+            };
+        }
+
+        function sendPacket(action, data) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action, ...data }));
+            }
+        }
+
+        function sendManualKey(key) {
+            sendPacket('keydown', { key });
+        }
+
+        function releaseManualKey(key) {
+            sendPacket('keyup', { key });
+        }
+
+        // --- Left Joystick: Movement (W/A/S/D) ---
+        function initLeftJoystick() {
+            const options = {
+                zone: document.getElementById('zone_left'),
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: '#3b82f6',
+                size: 150
+            };
+            leftJoystick = nipplejs.create(options);
+
+            leftJoystick.on('move', (evt, data) => {
+                if (!data.direction) return;
+                
+                const angle = data.angle.degree;
+                const force = data.force;
+                
+                let newKeys = new Set();
+                
+                // Determine keys based on angle (with some overlap for diagonals)
+                if (angle >= 45 && angle <= 135) newKeys.add('w');
+                if (angle >= 135 && angle <= 225) newKeys.add('a');
+                if (angle >= 225 && angle <= 315) newKeys.add('s');
+                if (angle >= 315 || angle <= 45) newKeys.add('d');
+
+                // Handle KeyDowns
+                newKeys.forEach(k => {
+                    if (!activeMoveKeys.has(k)) {
+                        activeMoveKeys.add(k);
+                        sendPacket('keydown', { key: k });
+                    }
+                });
+
+                // Handle KeyUps
+                activeMoveKeys.forEach(k => {
+                    if (!newKeys.has(k)) {
+                        activeMoveKeys.delete(k);
+                        sendPacket('keyup', { key: k });
+                    }
+                });
+            });
+
+            leftJoystick.on('end', () => {
+                activeMoveKeys.forEach(k => {
+                    sendPacket('keyup', { key: k });
+                });
+                activeMoveKeys.clear();
+            });
+        }
+
+        // --- Right Joystick: Mouse Look ---
+        let lastMouseSent = 0;
+        function initRightJoystick() {
+            const options = {
+                zone: document.getElementById('zone_right'),
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: '#06b6d4',
+                size: 150
+            };
+            rightJoystick = nipplejs.create(options);
+
+            rightJoystick.on('move', (evt, data) => {
+                const now = Date.now();
+                if (now - lastMouseSent < 20) return; // Limit to 50Hz for smoothness/bandwidth
+
+                const vector = data.vector;
+                const sensitivity = 15; // Adjustment factor for mouse speed
+                
+                // Send relative movement
+                sendPacket('mousemove', {
+                    x: Math.round(vector.x * sensitivity),
+                    y: Math.round(-vector.y * sensitivity) // Y is inverted in nipplejs relative to mouse
+                });
+                lastMouseSent = now;
+            });
+        }
+
+        window.onload = () => {
+            initLeftJoystick();
+            initRightJoystick();
+        };
+
+        // Keyboard Fallback
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase() === ' ' ? 'space' : e.key.toLowerCase();
+            sendPacket('keydown', { key });
+        });
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase() === ' ' ? 'space' : e.key.toLowerCase();
+            sendPacket('keyup', { key });
+        });
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Remote Game Controller</title>
     <style>
         body {
