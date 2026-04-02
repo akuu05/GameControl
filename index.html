@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Remote Game Controller</title>
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevents scrolling on mobile */
+            touch-action: manipulation;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(3, 80px);
+            gap: 10px;
+        }
+
+        .btn {
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .btn:active {
+            background: #007bff;
+            border-color: #00d4ff;
+        }
+
+        #status {
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+
+        .up    { grid-column: 2; grid-row: 1; }
+        .left  { grid-column: 1; grid-row: 2; }
+        .down  { grid-column: 2; grid-row: 3; }
+        .right { grid-column: 3; grid-row: 2; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Connecting to server...</div>
+
+    <div class="d-pad">
+        <div class="btn up"    data-key="w">W</div>
+        <div class="btn left"  data-key="a">A</div>
+        <div class="btn down"  data-key="s">S</div>
+        <div class="btn right" data-key="d">D</div>
+    </div>
+
+    <script>
+        // CHANGE THIS TO YOUR SERVER IP OR NGROK URL
+        const SERVER_URL = 'ws://YOUR_IP_HERE:8080';
+        const statusDiv = document.getElementById('status');
+        let socket;
+
+        function connect() {
+            socket = new WebSocket(SERVER_URL);
+
+            socket.onopen = () => {
+                statusDiv.innerText = "Connected";
+                statusDiv.style.color = "#4caf50";
+            };
+
+            socket.onclose = () => {
+                statusDiv.innerText = "Disconnected. Retrying...";
+                statusDiv.style.color = "#f44336";
+                setTimeout(connect, 2000);
+            };
+        }
+
+        function sendSignal(action, key) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action, key }));
+            }
+        }
+
+        // Handle both Mouse and Touch via Pointer Events
+        document.querySelectorAll('.btn').forEach(button => {
+            const key = button.getAttribute('data-key');
+
+            // When finger/mouse goes DOWN
+            button.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                sendSignal('keydown', key);
+            });
+
+            // When finger/mouse leaves or goes UP
+            const stopTrigger = (e) => {
+                e.preventDefault();
+                sendSignal('keyup', key);
+            };
+
+            button.addEventListener('pointerup', stopTrigger);
+            button.addEventListener('pointercancel', stopTrigger);
+            button.addEventListener('pointerleave', stopTrigger);
+        });
+
+        connect();
+    </script>
+</body>
+</html>
